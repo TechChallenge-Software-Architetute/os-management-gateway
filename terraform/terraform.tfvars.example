@@ -1,0 +1,4 @@
+# Copying this file to terraform.tfvars is intended only for local testing.
+# In GitHub Actions, these values come from GitHub repository secrets.
+aws_region = "us-east-1"
+origin_url = "http://YOUR_OS_MANAGEMENT_EC2_PUBLIC_IP:8080"
