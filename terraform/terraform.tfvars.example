@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars (or pass via CI). Do NOT commit real values.
+
+aws_region  = "us-east-1"
+environment = "homolog"
+
+# Backend app (the OS Management API on Kubernetes)
+origin_url = "https://app.example.com"
+
+# S3 bucket holding the os-management-lambda state (to read the functions' invoke ARNs).
+# The key is derived automatically: lambda/<environment>/terraform.tfstate
+lambda_state_bucket = "os-management-tfstate"
