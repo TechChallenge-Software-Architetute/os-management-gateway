@@ -1,4 +1,11 @@
-# Copying this file to terraform.tfvars is intended only for local testing.
-# In GitHub Actions, these values come from GitHub repository secrets.
-aws_region = "us-east-1"
-origin_url = "http://YOUR_OS_MANAGEMENT_EC2_PUBLIC_IP:8080"
+# Copy to terraform.tfvars (or pass via CI). Do NOT commit real values.
+
+aws_region  = "us-east-1"
+environment = "homolog"
+
+# Backend app (the OS Management API on Kubernetes)
+origin_url = "https://app.example.com"
+
+# S3 bucket holding the os-management-lambda state (to read the functions' invoke ARNs).
+# The key is derived automatically: lambda/<environment>/terraform.tfstate
+lambda_state_bucket = "os-management-tfstate"
