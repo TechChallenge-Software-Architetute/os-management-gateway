@@ -40,3 +40,42 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "log_retention_days" {
+  description = "Retention for the API Gateway access-log group."
+  type        = number
+  default     = 14
+}
+
+variable "manage_apigw_account" {
+  description = <<-EOT
+    Manage the account-level API Gateway CloudWatch Logs role (required for access logs).
+    This is a singleton per region/account — set to false if another stack already owns it.
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "throttle_rate_limit" {
+  description = "Steady-state requests/second applied to every route."
+  type        = number
+  default     = 50
+}
+
+variable "throttle_burst_limit" {
+  description = "Burst capacity applied to every route."
+  type        = number
+  default     = 100
+}
+
+variable "auth_throttle_rate_limit" {
+  description = "Tighter steady-state requests/second for the unauthenticated POST /auth route."
+  type        = number
+  default     = 5
+}
+
+variable "auth_throttle_burst_limit" {
+  description = "Tighter burst capacity for the unauthenticated POST /auth route."
+  type        = number
+  default     = 10
+}

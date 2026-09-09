@@ -125,6 +125,45 @@ resource "aws_api_gateway_integration" "proxy" {
 }
 
 # =============================================================================
+# Observability — structured (JSON) access logs + X-Ray
+# =============================================================================
+# REST API access/execution logs require an account-level CloudWatch Logs role.
+# That setting is a singleton per region/account: set manage_apigw_account = false
+# if another stack already owns it.
+
+resource "aws_iam_role" "apigw_cloudwatch" {
+  count = var.manage_apigw_account ? 1 : 0
+  name  = "${var.api_name}-${var.environment}-apigw-cloudwatch"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "apigateway.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "apigw_cloudwatch" {
+  count      = var.manage_apigw_account ? 1 : 0
+  role       = aws_iam_role.apigw_cloudwatch[0].name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+}
+
+resource "aws_api_gateway_account" "this" {
+  count               = var.manage_apigw_account ? 1 : 0
+  cloudwatch_role_arn = aws_iam_role.apigw_cloudwatch[0].arn
+
+  depends_on = [aws_iam_role_policy_attachment.apigw_cloudwatch]
+}
+
+resource "aws_cloudwatch_log_group" "access" {
+  name              = "/aws/apigateway/${var.api_name}-${var.environment}/access"
+  retention_in_days = var.log_retention_days
+}
+
+# =============================================================================
 # Deployment + stage
 # =============================================================================
 
@@ -150,11 +189,62 @@ resource "aws_api_gateway_deployment" "os_management" {
 }
 
 resource "aws_api_gateway_stage" "os_management" {
-  rest_api_id   = aws_api_gateway_rest_api.os_management.id
-  deployment_id = aws_api_gateway_deployment.os_management.id
-  stage_name    = var.environment
+  rest_api_id          = aws_api_gateway_rest_api.os_management.id
+  deployment_id        = aws_api_gateway_deployment.os_management.id
+  stage_name           = var.environment
+  xray_tracing_enabled = true
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.access.arn
+    format = jsonencode({
+      requestId          = "$context.requestId"
+      requestTime        = "$context.requestTime"
+      httpMethod         = "$context.httpMethod"
+      resourcePath       = "$context.resourcePath"
+      path               = "$context.path"
+      status             = "$context.status"
+      protocol           = "$context.protocol"
+      responseLatency    = "$context.responseLatency"
+      integrationLatency = "$context.integrationLatency"
+      integrationStatus  = "$context.integrationStatus"
+      principalId        = "$context.authorizer.principalId"
+      clientId           = "$context.authorizer.clientId"
+      authorizerError    = "$context.authorizer.error"
+      sourceIp           = "$context.identity.sourceIp"
+      userAgent          = "$context.identity.userAgent"
+      errorMessage       = "$context.error.message"
+    })
+  }
 
   tags = {
     Name = "${var.api_name}-${var.environment}"
+  }
+
+  depends_on = [aws_api_gateway_account.this]
+}
+
+# Default throttling for every route + a tighter cap on the unauthenticated /auth route
+# (CPF enumeration guard).
+resource "aws_api_gateway_method_settings" "default" {
+  rest_api_id = aws_api_gateway_rest_api.os_management.id
+  stage_name  = aws_api_gateway_stage.os_management.stage_name
+  method_path = "*/*"
+
+  settings {
+    throttling_rate_limit  = var.throttle_rate_limit
+    throttling_burst_limit = var.throttle_burst_limit
+    metrics_enabled        = true
+  }
+}
+
+resource "aws_api_gateway_method_settings" "auth" {
+  rest_api_id = aws_api_gateway_rest_api.os_management.id
+  stage_name  = aws_api_gateway_stage.os_management.stage_name
+  method_path = "${aws_api_gateway_resource.auth.path_part}/${aws_api_gateway_method.auth_post.http_method}"
+
+  settings {
+    throttling_rate_limit  = var.auth_throttle_rate_limit
+    throttling_burst_limit = var.auth_throttle_burst_limit
+    metrics_enabled        = true
   }
 }

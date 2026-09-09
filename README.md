@@ -21,7 +21,20 @@ ANY /* (Authorization: Bearer JWT)  -> API Gateway -> Authorizer Lambda (allow/d
 
 ## Technologies
 - AWS API Gateway (REST), AWS Lambda (referenced), Terraform (`~> 5.0` AWS provider)
+- CloudWatch structured (JSON) access logs + X-Ray tracing on the stage
 - GitHub Actions — CI (`terraform fmt`/`validate`) and CD (`develop`→homolog, `main`→prod)
+
+## API reference (Swagger / Postman)
+
+There is no OpenAPI document generated for the gateway itself — it only adds `POST /auth`
+and forwards everything else to the backend. Use the platform collection in the main repo:
+
+- **Bruno / Postman:** `os-management` → `bruno/os-management-api`
+  - `01 - Auth / 03 - Login via CPF (Serverless)` → `POST {{gatewayUrl}}/auth`
+  - `02 - Clients / 07 - My Orders`, `09/10 - Decide Order` → protected routes via `{{gatewayUrl}}`
+- **Swagger UI (backend):** `https://<backend>/swagger-ui/index.html`
+
+Point `gatewayUrl` at the `auth_endpoint` output (drop the trailing `/auth` for the base).
 
 ## Deploy
 
@@ -59,4 +72,15 @@ k8s-terraform -> database -> os-management-lambda -> os-management-gateway -> ap
 ```
 
 ## Notes
+- The `ANY /{proxy+}` route is guarded by the **CPF JWT authorizer**, so it is the entry
+  point for **clients**. Staff (ADMIN/TECHNICIAN) authenticate with e-mail/password directly
+  against the backend `POST /auth/login` and the backend Swagger UI is reached directly — not
+  through this gateway.
+- Protected calls only succeed if **os-management** runs the CPF-token filter (grants
+  `ROLE_CLIENT`, resolves the client by document). Deploy os-management
+  `feature/cpf-auth-integration` or later.
+- The authorizer keeps a 300s result cache; the authorizer Lambda returns a stage-wide Allow
+  (`…/<stage>/*/*`) so caching does not break multi-route sessions.
+- Access logs are JSON in CloudWatch (`/aws/apigateway/<api>-<env>/access`) with `requestId`
+  for correlation with the Lambda logs.
 - Remember to add the **`soat-architecture`** user to this repository.
