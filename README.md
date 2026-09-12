@@ -66,6 +66,10 @@ Repo **secrets**: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `ORIGIN_URL`
 State keys (same bucket, distinct keys): this repo uses `gateway/<env>/terraform.tfstate`
 and reads `lambda/<env>/terraform.tfstate`.
 
+No workflow de CD, o deploy do gateway só executa quando o state remoto do Lambda
+(`lambda/<env>/terraform.tfstate`) existe no bucket; caso contrário, o job registra
+um warning e finaliza sem erro para evitar falha por pré-requisito ausente.
+
 ## Deploy order
 
 ```
