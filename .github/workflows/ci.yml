@@ -6,6 +6,9 @@ on:
   push:
     branches: [feature/**]
 
+permissions:
+  contents: read
+
 jobs:
   terraform-validate:
     name: Terraform fmt & validate

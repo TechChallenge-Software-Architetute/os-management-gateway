@@ -58,6 +58,7 @@ Key outputs: `auth_endpoint`, `invoke_url`.
 ## CI/CD configuration
 
 Repo **variables**: `TF_STATE_BUCKET`, `AWS_REGION`.
+(`TF_STATE_BUCKET` can also be provided as a repository secret.)
 
 Repo **secrets**: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `ORIGIN_URL`
 (base URL of the backend app on Kubernetes).
