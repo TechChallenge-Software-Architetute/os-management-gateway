@@ -59,6 +59,7 @@ jobs:
           else
             echo "::warning::State remoto do Lambda não encontrado."
             echo "::warning::É necessário executar primeiro o projeto os-management-lambda e garantir que ele salve o state em: s3://${TF_STATE_BUCKET}/lambda/shared/terraform.tfstate"
+            exit 1
           fi
 
       - name: Terraform init
