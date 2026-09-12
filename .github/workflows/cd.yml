@@ -45,6 +45,22 @@ jobs:
             exit 1
           fi
 
+      - name: Validar state remoto do Lambda
+        shell: bash
+        run: |
+          LAMBDA_STATE_KEY="lambda/shared/terraform.tfstate"
+
+          if aws s3api head-object \
+            --bucket "${TF_STATE_BUCKET}" \
+            --key "${LAMBDA_STATE_KEY}" \
+            --region "${AWS_REGION}" >/dev/null 2>&1; then
+            echo "State do Lambda encontrado:"
+            echo "s3://${TF_STATE_BUCKET}/${LAMBDA_STATE_KEY}"
+          else
+            echo "::warning::State remoto do Lambda não encontrado."
+            echo "::warning::É necessário executar primeiro o projeto os-management-lambda e garantir que ele salve o state em: s3://${TF_STATE_BUCKET}/lambda/shared/terraform.tfstate"
+          fi
+
       - name: Terraform init
         run: |
           terraform init -input=false \
