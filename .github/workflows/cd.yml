@@ -45,21 +45,6 @@ jobs:
             exit 1
           fi
 
-      - name: Check Lambda remote state availability
-        id: lambda_state
-        run: |
-          LAMBDA_STATE_KEY="lambda/shared/terraform.tfstate"
-
-          if aws s3api head-object \
-            --bucket "${TF_VAR_lambda_state_bucket}" \
-            --key "$LAMBDA_STATE_KEY" >/dev/null 2>&1; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-            echo "State do Lambda encontrado: s3://${TF_VAR_lambda_state_bucket}/${LAMBDA_STATE_KEY}"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::State do Lambda não encontrado em s3://${TF_VAR_lambda_state_bucket}/${LAMBDA_STATE_KEY}."
-          fi
-
       - name: Terraform init
         run: |
           terraform init -input=false \
@@ -69,15 +54,12 @@ jobs:
             -backend-config="encrypt=true"
 
       - name: Terraform apply
-        run: terraform apply \
-          -auto-approve \
-          -input=false \
-          -var="aws_region=${AWS_REGION}"
+        run: |
+          terraform apply \
+            -auto-approve \
+            -input=false \
+            -var="aws_region=${AWS_REGION}"
 
       - name: Show gateway URL
         run: |
           echo "auth endpoint: $(terraform output -raw auth_endpoint)"
-
-      - name: Skip deploy when Lambda state is missing
-        if: steps.lambda_state.outputs.available != 'true'
-        run: echo "Deploy ignorado porque o state remoto do Lambda ainda não existe."
