@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars (or pass via CI). Do NOT commit real values.
+
+aws_region  = "us-east-1"
+environment = "homolog"
+
+# Backend app (the OS Management API on Kubernetes)
+origin_url = "https://app.example.com"
+
+# S3 bucket holding the os-management-lambda state (to read the functions' invoke ARNs).
+# The key is derived automatically: lambda/<environment>/terraform.tfstate
+lambda_state_bucket = "os-management-tfstate"
+
+# Structured (JSON) access logs go to CloudWatch. Set to false only if another stack
+# already manages the account-level API Gateway CloudWatch Logs role.
+# manage_apigw_account = true
+# log_retention_days   = 14
