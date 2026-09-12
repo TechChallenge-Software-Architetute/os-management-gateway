@@ -61,7 +61,6 @@ jobs:
           fi
 
       - name: Terraform init
-        if: steps.lambda_state.outputs.available == 'true'
         run: |
           terraform init -input=false \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
@@ -70,11 +69,12 @@ jobs:
             -backend-config="encrypt=true"
 
       - name: Terraform apply
-        if: steps.lambda_state.outputs.available == 'true'
-        run: terraform apply -auto-approve -input=false -var="aws_region=${{ env.AWS_REGION }}"
+        run: terraform apply \
+          -auto-approve \
+          -input=false \
+          -var="aws_region=${AWS_REGION}"
 
       - name: Show gateway URL
-        if: steps.lambda_state.outputs.available == 'true'
         run: |
           echo "auth endpoint: $(terraform output -raw auth_endpoint)"
 
