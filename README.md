@@ -22,7 +22,7 @@ ANY /* (Authorization: Bearer JWT)  -> API Gateway -> Authorizer Lambda (allow/d
 ## Technologies
 - AWS API Gateway (REST), AWS Lambda (referenced), Terraform (`~> 5.0` AWS provider)
 - CloudWatch structured (JSON) access logs + X-Ray tracing on the stage
-- GitHub Actions — CI (`terraform fmt`/`validate`) and CD (`develop`→homolog, `main`→prod)
+- GitHub Actions — CI (`terraform fmt`/`validate`) and CD (push to `develop` or `main`; the branch name is the environment)
 
 ## API reference (Swagger / Postman)
 
@@ -47,7 +47,7 @@ cp terraform.tfvars.example terraform.tfvars   # fill in real values
 
 terraform init \
   -backend-config="bucket=<state-bucket>" \
-  -backend-config="key=gateway/homolog/terraform.tfstate" \
+  -backend-config="key=gateway/develop/terraform.tfstate" \
   -backend-config="region=us-east-1"
 
 terraform apply

@@ -1,7 +1,11 @@
 # Copy to terraform.tfvars (or pass via CI). Do NOT commit real values.
 
 aws_region  = "us-east-1"
-environment = "homolog"
+environment = "develop"
+
+# Optional: guard the provider against deploying to the wrong account.
+# Empty = no restriction (local validation). CI sets this from AWS_ACCOUNT_ID_<ENV>.
+# aws_account_id = "123456789012"
 
 # Backend app (the OS Management API on Kubernetes)
 origin_url = "https://app.example.com"
