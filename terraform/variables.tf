@@ -11,7 +11,7 @@ variable "aws_account_id" {
 }
 
 variable "environment" {
-  description = "Deployment environment (homolog, prod). Drives the stage name and state keys."
+  description = "Deployment environment (develop, main). Drives the stage name and state keys."
   type        = string
 
   validation {
