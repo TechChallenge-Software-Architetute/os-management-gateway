@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 
-# develop -> homolog, main -> prod
+# Each branch has an isolated Terraform state and API Gateway environment.
 jobs:
   deploy:
     name: Deploy API Gateway
@@ -20,13 +20,11 @@ jobs:
       run:
         working-directory: terraform
     env:
-      TF_VAR_environment: shared
+      TF_VAR_environment: ${{ github.ref_name }}
       TF_VAR_origin_url: ${{ secrets.ORIGIN_URL }}
-      # Org-level secrets, MAIN/DEVELOP-suffixed, selected by branch (main->MAIN, develop->DEVELOP).
       TF_STATE_BUCKET: ${{ github.ref_name == 'main' && secrets.TF_STATE_BUCKET_MAIN || secrets.TF_STATE_BUCKET_DEVELOP }}
       TF_VAR_lambda_state_bucket: ${{ github.ref_name == 'main' && secrets.TF_STATE_BUCKET_MAIN || secrets.TF_STATE_BUCKET_DEVELOP }}
-      TF_VAR_aws_account_id: ${{ github.ref_name == 'main' && secrets.AWS_ACCOUNT_ID_MAIN || secrets.AWS_ACCOUNT_ID_DEVELOP }}
-      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,7 +33,7 @@ jobs:
         with:
           aws-access-key-id: ${{ github.ref_name == 'main' && secrets.AWS_ACCESS_KEY_ID_MAIN || secrets.AWS_ACCESS_KEY_ID_DEVELOP }}
           aws-secret-access-key: ${{ github.ref_name == 'main' && secrets.AWS_SECRET_ACCESS_KEY_MAIN || secrets.AWS_SECRET_ACCESS_KEY_DEVELOP }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -51,7 +49,7 @@ jobs:
       - name: Validar state remoto do Lambda
         shell: bash
         run: |
-          LAMBDA_STATE_KEY="lambda/shared/terraform.tfstate"
+          LAMBDA_STATE_KEY="lambda/${TF_VAR_environment}/terraform.tfstate"
 
           if aws s3api head-object \
             --bucket "${TF_STATE_BUCKET}" \
@@ -61,7 +59,7 @@ jobs:
             echo "s3://${TF_STATE_BUCKET}/${LAMBDA_STATE_KEY}"
           else
             echo "::warning::State remoto do Lambda não encontrado."
-            echo "::warning::É necessário executar primeiro o projeto os-management-lambda e garantir que ele salve o state em: s3://${TF_STATE_BUCKET}/lambda/shared/terraform.tfstate"
+            echo "::warning::É necessário executar primeiro o projeto os-management-lambda e garantir que ele salve o state em: s3://${TF_STATE_BUCKET}/${LAMBDA_STATE_KEY}"
             exit 1
           fi
 
@@ -69,7 +67,7 @@ jobs:
         run: |
           terraform init -input=false \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
-            -backend-config="key=gateway/shared/terraform.tfstate" \
+            -backend-config="key=gateway/${TF_VAR_environment}/terraform.tfstate" \
             -backend-config="region=${AWS_REGION}" \
             -backend-config="encrypt=true"
 
