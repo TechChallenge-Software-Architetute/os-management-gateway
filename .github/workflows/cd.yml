@@ -21,7 +21,7 @@ jobs:
         working-directory: terraform
     env:
       TF_VAR_environment: ${{ github.ref_name }}
-      TF_VAR_origin_url: ${{ secrets.ORIGIN_URL }}
+      TF_VAR_origin_url: ${{ github.ref_name == 'main' && secrets.ORIGIN_URL_MAIN || secrets.ORIGIN_URL }}
       TF_STATE_BUCKET: ${{ github.ref_name == 'main' && secrets.TF_STATE_BUCKET_MAIN || secrets.TF_STATE_BUCKET_DEVELOP }}
       TF_VAR_lambda_state_bucket: ${{ github.ref_name == 'main' && secrets.TF_STATE_BUCKET_MAIN || secrets.TF_STATE_BUCKET_DEVELOP }}
       # Activates the provider account guard (allowed_account_ids). Org-level secret,
