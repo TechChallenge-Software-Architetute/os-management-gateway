@@ -4,9 +4,11 @@ API Gateway da plataforma OS Management (FIAP SOAT — Tech Challenge Fase 3).
 
 Provisiona um **AWS API Gateway (REST)** que é o ponto de entrada público da plataforma:
 
-- **`POST /auth`** → encaminhado para a **Lambda emissora de autenticação** (pública; emite um JWT a partir de um CPF).
-- **`ANY /{proxy+}`** → protegido por um **authorizer JWT do tipo TOKEN** (a Lambda authorizer), depois
-  repassado para a aplicação backend rodando em Kubernetes.
+- **`POST /auth`** → forwarded to the **auth issuer Lambda** (public; issues a JWT from a CPF).
+- **`POST /auth/login`** → forwarded to the **backend** (public; staff login by e-mail/senha,
+  bypasses the authorizer just like `/auth`).
+- **`ANY /{proxy+}`** → protected by a **JWT TOKEN authorizer** (the authorizer Lambda), then
+  proxied to the backend application running on Kubernetes.
 
 As funções Lambda em si vivem no repositório **`os-management-lambda`**; este repositório lê os
 ARNs de invocação delas via `terraform_remote_state` e monta o gateway em torno delas.
@@ -43,8 +45,10 @@ flowchart LR
     proxy_route --- stage
 ```
 
-## Fluxo de Requisição
-
+POST /auth {cpf}                    -> API Gateway -> Issuer Lambda -> JWT (cliente)
+POST /auth/login {email,senha}      -> API Gateway -> backend       -> JWT (staff)
+ANY /* (Authorization: Bearer JWT)  -> API Gateway -> Authorizer Lambda (allow/deny)
+                                                   -> backend (Kubernetes) if allowed
 ```
 POST /auth {cpf}                    -> API Gateway -> Lambda Issuer -> JWT
 ANY /* (Authorization: Bearer JWT)  -> API Gateway -> Lambda Authorizer (allow/deny)
@@ -109,17 +113,17 @@ um warning e finaliza sem erro para evitar falha por pré-requisito ausente.
 k8s-terraform -> database -> os-management-lambda -> os-management-gateway -> app
 ```
 
-## Notas
-
-- A rota `ANY /{proxy+}` é protegida pelo **authorizer JWT de CPF**, então é o ponto de entrada
-  para **clientes**. A equipe interna (ADMIN/TECHNICIAN) se autentica com e-mail/senha diretamente
-  contra o backend `POST /auth/login`, e o Swagger UI do backend é acessado diretamente — não
-  através deste gateway.
-- Chamadas protegidas só funcionam se o **os-management** rodar o filtro de token CPF (concede
-  `ROLE_CLIENT`, resolve o cliente pelo documento). Faça deploy do os-management na branch
-  `feature/cpf-auth-integration` ou posterior.
-- O authorizer mantém um cache de resultado de 300s; a Lambda authorizer retorna um Allow
-  válido para todo o stage (`…/<stage>/*/*`), então o cache não quebra sessões com múltiplas rotas.
-- Logs de acesso são JSON no CloudWatch (`/aws/apigateway/<api>-<env>/access`) com `requestId`
-  para correlação com os logs da Lambda.
-- Lembrar de adicionar o usuário **`soat-architecture`** a este repositório.
+## Notes
+- The `ANY /{proxy+}` route is guarded by the **JWT authorizer**, which accepts any token
+  signed with the shared `JWT_SECRET` (client or staff); the **backend** then enforces roles.
+  Staff log in via the public **`POST /auth/login`** on this gateway and call protected routes
+  through `/{proxy+}` with their staff JWT. (The backend Swagger UI is still reached directly,
+  as it is not exposed as a public gateway route.)
+- Protected calls only succeed if **os-management** runs the CPF-token filter (grants
+  `ROLE_CLIENT`, resolves the client by document). Deploy os-management
+  `feature/cpf-auth-integration` or later.
+- The authorizer keeps a 300s result cache; the authorizer Lambda returns a stage-wide Allow
+  (`…/<stage>/*/*`) so caching does not break multi-route sessions.
+- Access logs are JSON in CloudWatch (`/aws/apigateway/<api>-<env>/access`) with `requestId`
+  for correlation with the Lambda logs.
+- Remember to add the **`soat-architecture`** user to this repository.
