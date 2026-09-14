@@ -5,6 +5,8 @@ API Gateway for the os-management platform (FIAP SOAT — Tech Challenge Fase 3)
 Provisions an **AWS API Gateway (REST)** that is the public entry point for the platform:
 
 - **`POST /auth`** → forwarded to the **auth issuer Lambda** (public; issues a JWT from a CPF).
+- **`POST /auth/login`** → forwarded to the **backend** (public; staff login by e-mail/senha,
+  bypasses the authorizer just like `/auth`).
 - **`ANY /{proxy+}`** → protected by a **JWT TOKEN authorizer** (the authorizer Lambda), then
   proxied to the backend application running on Kubernetes.
 
@@ -14,7 +16,8 @@ invoke ARNs via `terraform_remote_state` and wires the gateway around them.
 ## Request flow
 
 ```
-POST /auth {cpf}                    -> API Gateway -> Issuer Lambda -> JWT
+POST /auth {cpf}                    -> API Gateway -> Issuer Lambda -> JWT (cliente)
+POST /auth/login {email,senha}      -> API Gateway -> backend       -> JWT (staff)
 ANY /* (Authorization: Bearer JWT)  -> API Gateway -> Authorizer Lambda (allow/deny)
                                                    -> backend (Kubernetes) if allowed
 ```
@@ -77,10 +80,11 @@ k8s-terraform -> database -> os-management-lambda -> os-management-gateway -> ap
 ```
 
 ## Notes
-- The `ANY /{proxy+}` route is guarded by the **CPF JWT authorizer**, so it is the entry
-  point for **clients**. Staff (ADMIN/TECHNICIAN) authenticate with e-mail/password directly
-  against the backend `POST /auth/login` and the backend Swagger UI is reached directly — not
-  through this gateway.
+- The `ANY /{proxy+}` route is guarded by the **JWT authorizer**, which accepts any token
+  signed with the shared `JWT_SECRET` (client or staff); the **backend** then enforces roles.
+  Staff log in via the public **`POST /auth/login`** on this gateway and call protected routes
+  through `/{proxy+}` with their staff JWT. (The backend Swagger UI is still reached directly,
+  as it is not exposed as a public gateway route.)
 - Protected calls only succeed if **os-management** runs the CPF-token filter (grants
   `ROLE_CLIENT`, resolves the client by document). Deploy os-management
   `feature/cpf-auth-integration` or later.
