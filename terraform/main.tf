@@ -72,6 +72,38 @@ resource "aws_lambda_permission" "apigw_invoke_issuer" {
 }
 
 # =============================================================================
+# Public route: POST /auth/login -> backend app (staff login, no authorization)
+# =============================================================================
+# Staff authenticate tokenless (email/senha), so this route must bypass the JWT
+# authorizer just like POST /auth does. Being a specific resource, it takes
+# precedence over the greedy ANY /{proxy+}. It proxies straight to the backend
+# (HTTP_PROXY), which mints the staff JWT. Once staff hold a token, every other
+# route reaches the backend through /{proxy+} (the authorizer accepts any token
+# signed with the shared JWT_SECRET; the backend enforces roles).
+
+resource "aws_api_gateway_resource" "auth_login" {
+  rest_api_id = aws_api_gateway_rest_api.os_management.id
+  parent_id   = aws_api_gateway_resource.auth.id
+  path_part   = "login"
+}
+
+resource "aws_api_gateway_method" "auth_login_post" {
+  rest_api_id   = aws_api_gateway_rest_api.os_management.id
+  resource_id   = aws_api_gateway_resource.auth_login.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "auth_login_post" {
+  rest_api_id             = aws_api_gateway_rest_api.os_management.id
+  resource_id             = aws_api_gateway_resource.auth_login.id
+  http_method             = aws_api_gateway_method.auth_login_post.http_method
+  integration_http_method = "POST"
+  type                    = "HTTP_PROXY"
+  uri                     = "${trimsuffix(var.origin_url, "/")}/auth/login"
+}
+
+# =============================================================================
 # TOKEN authorizer (validates the JWT on protected routes)
 # =============================================================================
 
@@ -179,6 +211,10 @@ resource "aws_api_gateway_deployment" "os_management" {
       aws_api_gateway_resource.auth.id,
       aws_api_gateway_method.auth_post.id,
       aws_api_gateway_integration.auth_post.id,
+      aws_api_gateway_resource.auth_login.id,
+      aws_api_gateway_method.auth_login_post.id,
+      aws_api_gateway_integration.auth_login_post.id,
+      aws_api_gateway_integration.auth_login_post.uri,
       aws_api_gateway_authorizer.jwt.id,
       aws_api_gateway_resource.proxy.id,
       aws_api_gateway_method.proxy.id,
@@ -245,6 +281,19 @@ resource "aws_api_gateway_method_settings" "auth" {
   rest_api_id = aws_api_gateway_rest_api.os_management.id
   stage_name  = aws_api_gateway_stage.os_management.stage_name
   method_path = "${aws_api_gateway_resource.auth.path_part}/${aws_api_gateway_method.auth_post.http_method}"
+
+  settings {
+    throttling_rate_limit  = var.auth_throttle_rate_limit
+    throttling_burst_limit = var.auth_throttle_burst_limit
+    metrics_enabled        = true
+  }
+}
+
+# Same tighter cap on the public staff login route (brute-force guard).
+resource "aws_api_gateway_method_settings" "auth_login" {
+  rest_api_id = aws_api_gateway_rest_api.os_management.id
+  stage_name  = aws_api_gateway_stage.os_management.stage_name
+  method_path = "${aws_api_gateway_resource.auth.path_part}/${aws_api_gateway_resource.auth_login.path_part}/${aws_api_gateway_method.auth_login_post.http_method}"
 
   settings {
     throttling_rate_limit  = var.auth_throttle_rate_limit
