@@ -23,7 +23,6 @@ jobs:
       TF_VAR_environment: ${{ github.ref_name }}
       TF_VAR_origin_url: ${{ github.ref_name == 'main' && secrets.ORIGIN_URL_MAIN || secrets.ORIGIN_URL }}
       TF_STATE_BUCKET: ${{ github.ref_name == 'main' && secrets.TF_STATE_BUCKET_MAIN || secrets.TF_STATE_BUCKET_DEVELOP }}
-      TF_VAR_lambda_state_bucket: ${{ github.ref_name == 'main' && secrets.TF_STATE_BUCKET_MAIN || secrets.TF_STATE_BUCKET_DEVELOP }}
       # Activates the provider account guard (allowed_account_ids). Org-level secret,
       # selected by branch (main->MAIN, develop->DEVELOP); empty = no restriction.
       TF_VAR_aws_account_id: ${{ github.ref_name == 'main' && secrets.AWS_ACCOUNT_ID_MAIN || secrets.AWS_ACCOUNT_ID_DEVELOP }}
@@ -46,23 +45,6 @@ jobs:
         run: |
           if [ -z "${TF_STATE_BUCKET}" ]; then
             echo "TF_STATE_BUCKET is not configured. Set repository variable TF_STATE_BUCKET or secret TF_STATE_BUCKET."
-            exit 1
-          fi
-
-      - name: Validar state remoto do Lambda
-        shell: bash
-        run: |
-          LAMBDA_STATE_KEY="lambda/${TF_VAR_environment}/terraform.tfstate"
-
-          if aws s3api head-object \
-            --bucket "${TF_STATE_BUCKET}" \
-            --key "${LAMBDA_STATE_KEY}" \
-            --region "${AWS_REGION}" >/dev/null 2>&1; then
-            echo "State do Lambda encontrado:"
-            echo "s3://${TF_STATE_BUCKET}/${LAMBDA_STATE_KEY}"
-          else
-            echo "::warning::State remoto do Lambda não encontrado."
-            echo "::warning::É necessário executar primeiro o projeto os-management-lambda e garantir que ele salve o state em: s3://${TF_STATE_BUCKET}/${LAMBDA_STATE_KEY}"
             exit 1
           fi
 
