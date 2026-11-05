@@ -36,9 +36,39 @@ variable "origin_url" {
   }
 }
 
-variable "lambda_state_bucket" {
-  description = "S3 bucket holding the os-management-lambda Terraform state."
+variable "lambda_name_prefix" {
+  description = <<-EOT
+    Prefix os-management-lambda uses for its function names (its own `name_prefix`
+    variable). The gateway derives `<prefix>-issuer-<env>` and
+    `<prefix>-authorizer-<env>` from it instead of reading that repo's Terraform
+    state, which is what lets the two deploy in any order.
+  EOT
   type        = string
+  default     = "os-auth"
+}
+
+variable "issuer_function_name" {
+  description = "Overrides the derived issuer function name. Empty = derive it."
+  type        = string
+  default     = ""
+}
+
+variable "authorizer_function_name" {
+  description = "Overrides the derived authorizer function name. Empty = derive it."
+  type        = string
+  default     = ""
+}
+
+variable "issuer_invoke_arn" {
+  description = "Overrides the derived issuer invoke ARN. Empty = derive it."
+  type        = string
+  default     = ""
+}
+
+variable "authorizer_invoke_arn" {
+  description = "Overrides the derived authorizer invoke ARN. Empty = derive it."
+  type        = string
+  default     = ""
 }
 
 variable "tags" {

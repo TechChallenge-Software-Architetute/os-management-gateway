@@ -10,8 +10,12 @@ Provisiona um **AWS API Gateway (REST)** que é o ponto de entrada público da p
 - **`ANY /{proxy+}`** → protected by a **JWT TOKEN authorizer** (the authorizer Lambda), then
   proxied to the backend application running on Kubernetes.
 
-As funções Lambda em si vivem no repositório **`os-management-lambda`**; este repositório lê os
-ARNs de invocação delas via `terraform_remote_state` e monta o gateway em torno delas.
+As funções Lambda em si vivem no repositório **`os-management-lambda`**. Este repositório as
+endereça por **nome determinístico** (`<lambda_name_prefix>-issuer-<environment>` e
+`<lambda_name_prefix>-authorizer-<environment>`) e monta o ARN de invocação a partir da conta e
+da região — **não** lê o `terraform_remote_state` do outro repositório. Era essa leitura que
+tornava o deploy do gateway dependente do deploy do Lambda; agora os dois aplicam em qualquer
+ordem.
 
 ## Arquitetura
 
@@ -25,7 +29,7 @@ flowchart LR
         stage["Stage (homolog/prod)<br/>Access logs JSON + X-Ray"]
     end
 
-    subgraph LAMBDA["os-management-lambda (terraform_remote_state)"]
+    subgraph LAMBDA["os-management-lambda (referenciado por nome)"]
         issuer["Lambda: Auth Issuer"]
         authz["Lambda: Token Authorizer"]
     end
@@ -75,8 +79,12 @@ Aponte `gatewayUrl` para o output `auth_endpoint` (removendo o `/auth` final par
 
 ## Passos para Execução e Deploy
 
-Pré-requisitos: o stack do `os-management-lambda` precisa estar aplicado antes (seu state
-fornece os ARNs de invocação das funções), e a URL da aplicação backend precisa estar acessível.
+Pré-requisito: a URL da aplicação backend precisa estar acessível.
+
+O stack do `os-management-lambda` **não** precisa ter rodado antes: os nomes das funções e os
+ARNs de invocação são derivados de `lambda_name_prefix` + `environment`. Enquanto as funções não
+existirem, as rotas que dependem delas respondem 5xx em runtime, mas o `apply` do gateway
+conclui normalmente.
 
 ```bash
 cd terraform
@@ -100,18 +108,21 @@ Outputs principais: `auth_endpoint`, `invoke_url`.
 **Secrets** do repositório: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `ORIGIN_URL`
 (URL base da aplicação backend em Kubernetes).
 
-Chaves de state (mesmo bucket, chaves distintas): este repositório usa `gateway/<env>/terraform.tfstate`
-e lê `lambda/<env>/terraform.tfstate`.
+Chave de state: este repositório usa `gateway/<env>/terraform.tfstate` e **não lê o state de
+nenhum outro repositório**.
 
-No workflow de CD, o deploy do gateway só executa quando o state remoto do Lambda
-(`lambda/<env>/terraform.tfstate`) existe no bucket; caso contrário, o job registra
-um warning e finaliza sem erro para evitar falha por pré-requisito ausente.
+O workflow de CD não tem mais o passo que verificava `lambda/<env>/terraform.tfstate` e falhava
+quando o arquivo não existia. Era a única dependência real entre deploys do sistema.
 
 ## Ordem de Deploy
 
 ```
 k8s-terraform -> database -> os-management-lambda -> os-management-gateway -> app
 ```
+
+Essa é a ordem **recomendada** para o sistema ficar funcional ponta a ponta, não uma
+dependência de deploy: nenhum stack lê o state de outro, então cada um aplica isoladamente e em
+qualquer ordem.
 
 ## Notes
 - The `ANY /{proxy+}` route is guarded by the **JWT authorizer**, which accepts any token

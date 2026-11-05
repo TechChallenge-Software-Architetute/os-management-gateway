@@ -10,9 +10,17 @@ environment = "develop"
 # Backend app (the OS Management API on Kubernetes)
 origin_url = "https://app.example.com"
 
-# S3 bucket holding the os-management-lambda state (to read the functions' invoke ARNs).
-# The key is derived automatically: lambda/<environment>/terraform.tfstate
-lambda_state_bucket = "os-management-tfstate"
+# The auth Lambdas are addressed by deterministic name, not by reading the
+# os-management-lambda Terraform state, so the two stacks deploy in any order.
+# This must match that repo's `name_prefix` (default "os-auth"); the gateway
+# derives <prefix>-issuer-<environment> and <prefix>-authorizer-<environment>.
+# lambda_name_prefix = "os-auth"
+
+# Overrides, only if the functions are named differently. Empty = derive.
+# issuer_function_name     = ""
+# authorizer_function_name = ""
+# issuer_invoke_arn        = ""
+# authorizer_invoke_arn    = ""
 
 # Structured (JSON) access logs go to CloudWatch. Set to false only if another stack
 # already manages the account-level API Gateway CloudWatch Logs role.
